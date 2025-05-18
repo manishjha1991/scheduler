@@ -8,7 +8,8 @@ const API_ENDPOINTS="http://localhost:3000"
 const API_BASE = `${API_ENDPOINTS}/api/bids`;
 const EXIT_PATH   = id => `${API_BASE}/${id}/exit-second-highest`;
 const SELL_PATH   = id => `${API_BASE}/players/${id}/soldcrone`;
-
+const SINGLE_PLAYER_PATH = id => `${API_BASE}/players/singlebid`
+const SINGLE_BID_PATH  = `${API_BASE}/players/singlebid`;
 // Fetch all unsold players from your API
 async function fetchUnsoldPlayers() {
   const res = await axios.get(`${API_BASE}/players?filter=unsold`);
@@ -54,7 +55,7 @@ async function processPlayer(playerId) {
     } else {
       // fewer than 2 bidders → FINALIZE SALE
       console.log(`   FINAL: selling ${playerId}`);
-    //   await finalizeSale(playerId);
+      await finalizeSale(playerId);
     }
   };
 
@@ -87,14 +88,25 @@ async function finalizeSale(playerId) {
   }
 }
 
-
-
-async function finalizeSingleBidSinceStarting(playerId) {
+  async function finalizeSingleBidSinceStarting() {
     try {
-      const res = await axios.get(`${API_BASE}/players/${playerId}/singlebid`);
-      console.log(`Sold player:`, res);
+      // 1) get the list of single‐bid players
+      const { data } = await axios.post(SINGLE_BID_PATH);
+      const ids = data.resultMain;            // ["676d7d14ed25f86180707fb1", …]
+  
+      if (!Array.isArray(ids) || ids.length === 0) {
+        console.log('No single‐bid players to finalize.');
+        return;
+      }
+  
+      // 2) for each ID, call the sold‐cron endpoint
+      for (const playerId of ids) {
+        // optional: validate length of playerId === 24 before calling
+        const resSold = await axios.post(SELL_PATH(playerId));
+        console.log(`Sold player ${playerId}:`, resSold.data);
+      }
     } catch (err) {
-      console.error(`Error selling player ${playerId}:`, err);
+      console.error('Error in finalizeSingleBidSinceStarting:', err.response?.data || err.message);
     }
   }
 console.log('🕒 Auction scheduler running…');
